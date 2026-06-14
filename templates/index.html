@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Crucial for Mobile -->
+    <title>English Practice</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <header>
+        <h1>🇬🇧 English Master</h1>
+        <button id="toggle-admin-btn">Admin Panel</button>
+    </header>
+
+    <!-- User Section -->
+    <main id="user-interface">
+        <div class="intro-card">
+            <h2>Simple Present Tense</h2>
+            <p>Select an exercise below to start practicing.</p>
+        </div>
+
+        <div id="exercise-list"></div>
+        
+        <!-- Hidden container for active exercise -->
+        <div id="active-exercise-container" class="hidden">
+            <button onclick="closeExercise()" class="back-btn">&larr; Back</button>
+            <h3 id="display-question"></h3>
+            <input type="text" id="user-input" placeholder="Type your answer here...">
+            <br><br>
+            <button onclick="submitAnswer()">Check Answer</button>
+            <p id="feedback-msg"></p>
+        </div>
+    </main>
+
+    <!-- Admin Section (Hidden by default) -->
+    <section id="admin-panel" class="hidden">
+        <h2>Add New Exercise</h2>
+        <form onsubmit="addNewExercise(event)">
+            <input type="text" name="question" placeholder="Question text (e.g., She ___ to work)" required>
+            <input type="text" name="answer" placeholder="Correct Answer (e.g., goes)" required>
+            <button type="submit">Add Exercise</button>
+        </form>
+    </section>
+
+    <script>
+        let currentExerciseId = null;
+
+        // Load exercises on startup
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('/api/exercises')
+                .then(res => res.json())
+                .then(data => {
+                    const listContainer = document.getElementById('exercise-list');
+                    data.forEach(ex => {
+                        const btn = document.createElement('button');
+                        btn.className = 'exercise-btn';
+                        btn.innerText = ex.question;
+                        btn.onclick = () => openExercise(ex.id, ex.question);
+                        listContainer.appendChild(btn);
+                    });
+                });
+        });
+
+        // UI Functions
+        function openExercise(id, question) {
+            currentExerciseId = id;
+            document.getElementById('exercise-list').classList.add('hidden');
+            document.querySelector('.intro-card').classList.add('hidden');
+            document.getElementById('active-exercise-container').classList.remove('hidden');
+            
+            document.getElementById('display-question').innerText = question;
+            document.getElementById('user-input').value = '';
+            document.getElementById('feedback-msg').innerText = '';
+        }
+
+        function closeExercise() {
+            document.getElementById('exercise-list').classList.remove('hidden');
+            document.querySelector('.intro-card').classList.remove('hidden');
+            document.getElementById('active-exercise-container').classList.add('hidden');
+            currentExerciseId = null;
+        }
+
+        async function submitAnswer() {
+            const input = document.getElementById('user-input').value;
+            if(!input) return alert("Please type an answer");
+
+            const res = await fetch('/api/check', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({id: currentExerciseId, answer: input})
+            });
+            
+            const data = await res.json();
+            const feedback = document.getElementById('feedback-msg');
+            
+            if(data.correct) {
+                feedback.style.color = "green";
+                feedback.innerText = "✅ " + data.message;
+            } else {
+                feedback.style.color = "red";
+                feedback.innerText = "❌ " + data.message;
+            }
+        }
+
+        // Admin Functions
+        document.getElementById('toggle-admin-btn').addEventListener('click', () => {
+            const panel = document.getElementById('admin-panel');
+            panel.classList.toggle('hidden');
+        });
+
+        async function addNewExercise(e) {
+            e.preventDefault();
+            const form = e.target;
+            const formData = new FormData(form);
+            
+            await fetch('/api/admin/add', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    question: formData.get('question'),
+                    answer: formData.get('answer')
+                })
+            });
+
+            alert("Exercise added!");
+            form.reset();
+            location.reload(); // Reload to see new exercise immediately
+        }
+    </script>
+</body>
+</html>
